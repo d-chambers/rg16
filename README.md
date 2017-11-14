@@ -1,6 +1,5 @@
-===============================
-rg16
-===============================
+# rg16
+
 
 Obspy read support for Fairfield Nodal Receiver Gather format 1.6-1
 
