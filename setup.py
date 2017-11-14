@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # from detex.version import __version__
 from glob import glob
-from os.path import join, abspath, dirname, isdir
+from os.path import join, abspath, dirname
 
 from setuptools import setup
 
@@ -37,8 +37,8 @@ entry_points = {
         'RG16 = obspy.io.ascii.core',
     ],
     'obspy.plugin.waveform.RG16': [
-        'isFormat = rg16:is_rg16',
-        'readFormat = rg16:read_rg16',
+        'isFormat = rg16.core:is_rg16',
+        'readFormat = rg16.core:read_rg16',
     ]
 }
 

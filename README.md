@@ -14,3 +14,6 @@ and obspy should be able to read the rg1.6 format.
 >>> pip install git+https://github.com/d-chambers/rg16
 ```
 
+Now obspy.read should recognize and read Receiver Gather format 1.6-1.
+
+Write support is not planned.
