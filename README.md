@@ -6,8 +6,8 @@ Obspy read support for Fairfield Nodal Receiver Gather format 1.6-1
 Quickstart
 ---------
 
-I will be working on integrating this into obspy, but it make it into obspy
-until version 1.2.0 at the earliest (around April 2018 perhaps).
+I will be working on integrating this into obspy, but it wont make it into obspy
+until at least version 1.2.0 (to be released around April 2018 perhaps).
 Until then, just pip install this package using its git url
 and obspy should be able to detect and read the rg1.6 format automatically.
 
@@ -15,7 +15,7 @@ and obspy should be able to detect and read the rg1.6 format automatically.
 >>> pip install git+https://github.com/d-chambers/rg16
 ```
 
-Now obspy.read should recognize and read Receiver Gather format 1.6-1.
+Now obspy.read should recognize and read Receiver Gather 1.6-1 files.
 
 ```python
 import obspy
