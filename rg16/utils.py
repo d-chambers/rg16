@@ -19,16 +19,20 @@ def open_file(func):
     def _wrap(*args, **kwargs):
         first_arg = args[0]
         try:
-            with open(first_arg, 'rb') as fi:
-                new_args = tuple([fi] + list(args[1:]))
-                return func(*new_args, **kwargs)
+            fi = open(first_arg, 'rb')
         except TypeError:  # assume we have been passed a buffer
+            assert hasattr(args[0], 'read')
             return func(*args, **kwargs)
+        else:
+            args = tuple([fi] + list(args[1:]))
+            out = func(*args, **kwargs)
+            fi.close()
+            return out
 
     return _wrap
 
 
-# -------------------- functions for byte chunks
+# -------------------- functions for byte chunk reads
 
 
 READ_FUNCS = {}
@@ -44,8 +48,8 @@ def register_read_func(dtype):
 
 def read_block(fi, spec, start_bit=0):
     out = {}
-    for name, func, start, length, fmt in spec:
-        out[name] = func(fi, start_bit + np.array(start), length, fmt)
+    for name, start, length, fmt in spec:
+        out[name] = read(fi, start_bit + np.array(start), length, fmt)
     return out
 
 
@@ -62,7 +66,11 @@ def read(fi, position, length, dtype):
     length
         Length of bytes to read
     dtype
-        The data type, all numpy data types are supported plus 'bcd'
+        The data type, all numpy data types are supported plus the following:
+            bcd - binary coded decimal
+            <i3 - little endian 3 byte int
+            >i3 - big endian 3 byte int
+            >i. - 4 bit int, left four bits
     """
     # if a list is passed as parameters then recurse through each
     if isinstance(position, (collections.Sequence, np.ndarray)):
@@ -107,24 +115,27 @@ def read_bcd(fi, length):
 
 @register_read_func(None)
 def read_bytes(fi, length):
+    """ simply read raw bytes """
     return fi.read(length)
 
 
 @register_read_func('<i3')
 def read_24_bit_little(fi, length):
+    """ read a 3 byte int, little endian """
     chunk = fi.read(length)
     return struct.unpack('<I', chunk + b'\x00')[0]
 
 
 @register_read_func('>i3')
 def read_24_bit_big(fi, length):
+    """ read a 3 byte int, big endian """
     chunk = fi.read(length)
     return struct.unpack('>I', b'\x00' + chunk)[0]
 
 
 @register_read_func('>i.')
 def read_4_bit_left(fi, length):
-    """ read the four bits on the right """
+    """ read the four bits on the left """
     assert length == 1, 'half byte reads only support 1 byte length'
     ints = np.fromstring(fi.read(length), dtype='<u1')[0]
     return np.bitwise_and(ints >> 4, 0x0f)

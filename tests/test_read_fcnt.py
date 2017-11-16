@@ -86,3 +86,13 @@ class TestStartTimeEndTime:
         start = st[0].stats.starttime
         end = st[0].stats.endtime
         assert start < tpoint < end
+
+
+class TestMerge:
+    def test_merge(self, fcnt_file):
+        """ ensure the merge option of read_rg16 merges all contiguous
+        traces together """
+        st_merged = read_rg16(fcnt_file, merge=True)
+        st = read_rg16(fcnt_file).merge()
+        assert len(st) == len(st_merged)
+        assert st == st_merged
