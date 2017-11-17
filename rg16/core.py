@@ -10,12 +10,11 @@ Some useful diagrams, provided by Faifield technical support, for
 understanding Base Scan intervals, data format, and sensor type numbers
 can be found here: https://imgur.com/a/4aneG
 """
-import copy
 
 import numpy as np
 from obspy.core import Stream, Trace, Stats, UTCDateTime
 
-from rg16.utils import read, open_file, read_block
+from rg16.utils import read, open_file, read_block, quick_merge
 
 # ------------------- define specs of various blocks
 
@@ -68,8 +67,8 @@ trace_header_block = [
 # since UTCDateTime cannot be compared to np.inf in py27 get a large timestamp
 # after which I will be dead (somebody else's problem)
 BIG_TS = UTCDateTime('3000-01-01').timestamp
-
-
+import obspy
+obspy.read
 # ------------------- read and format check functions
 
 
@@ -79,24 +78,20 @@ def read_rg16(fi, headonly=False, starttime=None, endtime=None, merge=False,
     """
     Read fairfield nodal's Receiver Gather File Format version 1.6-1.
 
-    Parameters
-    ----------
-    fi: str or buffer
-        A path to the file to read or a buffer of an opened file.
-    headonly: bool
-        If True don't read data, only header information.
-    starttime: Optional, obspy.UTCDateTime
-        If not None dont read traces that end before starttime.
-    endtime: Optional, obspy.UTCDateTime
-        If None None dont read traces that start after endtime.
-    merge: bool
+    :param fi: A path to the file to read or a buffer of an opened file.
+    :type fi: str, buffer
+    :param headonly: If True don't read data, only header information.
+    :type headonly: bool
+    :param starttime: If not None dont read traces that end before starttime.
+    :type starttime: optional, obspy.UTCDateTime
+    :param endtime: If None None dont read traces that start after endtime.
+    :type endtime: optional, obspy.UTCDateTime
+    :param merge:
         If True merge contiguous data blocks as they are found. For
         continuous data files having 100,000+ traces this will create
         more manageable streams.
-
-    Returns
-    -------
-    obspy.Stream
+    :type merge: bool
+    :return: An ObsPy :class:`~obspy.core.stream.Stream` object.
     """
     if not is_rg16(fi):
         raise ValueError('read_fcnt was not passed a Fairfield RG 1.6 file')
@@ -124,8 +119,13 @@ def read_rg16(fi, headonly=False, starttime=None, endtime=None, merge=False,
 
 @open_file
 def is_rg16(fi, **kwargs):
-    """ reads key information from header to figure out if this is rg16
-    from fairfield nodal """
+    """
+    Determine if a file or buffer contains an rg16 file.
+
+    :param fi: A path to the file to read or a buffer of an opened file.
+    :type fi: str, buffer
+    :return: bool
+    """
     sample_format = read(fi, 2, 2, 'bcd')
     manufacturer_code = read(fi, 16, 1, 'bcd')
     version = read(fi, 42, 2, None)
@@ -134,66 +134,6 @@ def is_rg16(fi, **kwargs):
 
 
 # ------------ helper functions for formatting specific blocks
-
-
-def _trace_list_to_rec_array(traces):
-    """ return a recarray from the trace list. These are seperated into
-     two arrays due to a weird issue with numpy.sort returning and error
-     set. """
-    # get the id, starttime, endtime into a recarray
-    dtype1 = [('id', object), ('starttime', float), ('endtime', float)]
-    dtype2 = [('data', object), ('stats', object)]
-    data1 = [(tr.id, tr.stats.starttime.timestamp, tr.stats.endtime.timestamp)
-             for tr in traces]
-    data2 = [(tr.data, tr.stats) for tr in traces]
-    ar1 = np.array(data1, dtype=dtype1)  # array of id, starttime, endtime
-    ar2 = np.array(data2, dtype=dtype2)  # array of data, stats objects
-    #
-    sort_index = np.argsort(ar1, order=['id', 'starttime'])
-    return ar1[sort_index], ar2[sort_index]
-
-
-def _get_trace_groups(ar, diff):
-    """
-    Return an array of ints where each element corresponds to a pre-merged
-    trace row. All trace rows with the same group number can be merged.
-    """
-    # get a bool of if ids are the same as the next row down
-    ids_different = np.ones(len(ar), dtype=bool)
-    ids_different[1:] = ar['id'][1:] != ar['id'][:-1]
-    # get bool of endtimes within one sample of starttime of next row
-    disjoint = np.zeros(len(ar), dtype=bool)
-    start_end_diffs = ar['starttime'][1:] - ar['endtime'][:-1]
-    disjoint[:-1] = np.abs(start_end_diffs) <= diff
-    # get groups (not disjoint, not different ids)
-    return np.cumsum(ids_different & disjoint)
-
-
-def _quick_merge(traces, small_number=.000001):
-    """
-    Quickly merge traces together that are of the same datatype and
-    sampling_rate and dont have data overlaps.
-    """
-    # make sure sampling rates are all the same
-    assert len({tr.stats.sampling_rate for tr in traces}) == 1
-    assert len({tr.data.dtype for tr in traces}) == 1
-    sampling_rate = traces[0].stats.sampling_rate
-    diff = 1. / sampling_rate + small_number
-    # get the array
-    ar, trace_ar = _trace_list_to_rec_array(traces)
-    # get groups of traces that can be merged together
-    group = _get_trace_groups(ar, diff)
-    group_numbers = np.unique(group)
-    out = [None] * len(group_numbers)  # init output list
-    for index, gnum in enumerate(group_numbers):
-        # ar_to_merge = ar[group == gnum]
-        trace_ar_to_merge = trace_ar[group == gnum]
-        new_data = np.concatenate(trace_ar_to_merge['data'])
-        # get updated stats object
-        new_stats = copy.deepcopy(trace_ar_to_merge['stats'][0])
-        new_stats.npts = len(new_data)
-        out[index] = Trace(data=new_data, header=new_stats)
-    return out
 
 
 def _make_traces(fi, data_block_start, gheader, num_traces, head_only=False,
@@ -215,7 +155,7 @@ def _make_traces(fi, data_block_start, gheader, num_traces, head_only=False,
         trace_position += stats.npts * 4 + theader['num_ext_blocks'] * 32 + 20
         traces.append(Trace(data=data, header=stats))
     if merge:
-        traces = _quick_merge(traces)
+        traces = quick_merge(traces)
     return traces
 
 
