@@ -3,15 +3,16 @@ tests for reading fcnt files
 """
 import glob
 import io
+import os
 import unittest
-from os.path import join
+from os.path import join, abspath
 
 import obspy
-import pytest
 
 from rg16.core import read_rg16
 
-FCNT_FILES = glob.glob(join(pytest.test_data_path, 'fcnt', '*'))
+TEST_FCNT_DIRECTORY = join(abspath(os.getcwd()), 'test_data', 'fcnt')
+FCNT_FILES = glob.glob(join(TEST_FCNT_DIRECTORY, '*'))
 FCNT_STREAMS = [read_rg16(x) for x in FCNT_FILES]
 
 
@@ -94,3 +95,7 @@ class TestMerge(unittest.TestCase):
             st = read_rg16(fcnt_file).merge()
             self.assertEqual(len(st), len(st_merged))
             self.assertEqual(st, st_merged)
+
+
+if __name__ == '__main__':
+    unittest.main()

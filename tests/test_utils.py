@@ -79,3 +79,7 @@ class TestRead(unittest.TestCase):
         fi = byte_io(b'\xff\xff')
         with self.assertRaises(ValueError):
             read(fi, [0, 1], [1, 1], ['bcd', 'bcd'])
+
+
+if __name__ == '__main__':
+    unittest.main()
