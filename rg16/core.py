@@ -67,8 +67,8 @@ trace_header_block = [
 # since UTCDateTime cannot be compared to np.inf in py27 get a large timestamp
 # after which I will be dead (somebody else's problem)
 BIG_TS = UTCDateTime('3000-01-01').timestamp
-import obspy
-obspy.read
+
+
 # ------------------- read and format check functions
 
 

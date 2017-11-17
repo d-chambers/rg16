@@ -95,13 +95,8 @@ def read(fi, position, length, dtype):
     if dtype in READ_FUNCS:
         return READ_FUNCS[dtype](fi, length)
     else:
-        # convert length to count arg in np.fromfile
-        dtype_num = int([x for x in dtype if x.isdigit()][0])
-        # make sure it goes into the length evenly
-        count = length / dtype_num
-        assert count % 1.0 == 0.0
-        fromfi = np.fromfile(fi, dtype, count=int(count))
-        return fromfi[0] if len(fromfi) == 1 else fromfi
+        data = np.fromstring(fi.read(int(length)), dtype)
+        return data[0] if len(data) == 1 else data
 
 
 @register_read_func('bcd')

@@ -1,14 +1,10 @@
 """
-tests for the Utilities
+tests for the Utilities of rg16
 """
+import unittest
 from io import BytesIO
 
-import pytest
-
 from rg16.utils import read
-
-
-# TODO: Look at using this: goo.gl/sNCFvg
 
 
 def byte_io(byte_str):
@@ -16,7 +12,7 @@ def byte_io(byte_str):
     return BytesIO(byte_str)
 
 
-class TestRead:
+class TestRead(unittest.TestCase):
     """
     Tests for the read function, which should read all the weird binary
     formats used in this file format.
@@ -29,18 +25,18 @@ class TestRead:
         (b'\x99\x01', 2, 9901),
     ]
 
-    @pytest.mark.parametrize('byte, length, answer', bcd)
-    def test_read_bcd(self, byte, length, answer):
+    def test_read_bcd(self):
         """ ensure bcd encoding returns expected values """
-        out = read(byte_io(byte), 0, length, 'bcd')
-        assert out == answer
+        for byte, length, answer in self.bcd:
+            out = read(byte_io(byte), 0, length, 'bcd')
+            self.assertEqual(out, answer)
 
     def test_ff_raises(self):
         """ ensure FF raises. BCD values for any half byte past 9 should
         raise """
-        with pytest.raises(ValueError) as e:
+        with self.assertRaises(ValueError) as e:
             read(byte_io(b'\xFF'), 0, 1, 'bcd')
-        assert 'are not valid bcd' in str(e)
+        assert 'are not valid bcd' in str(e.exception)
 
     # --- test half byte reads
 
@@ -51,10 +47,10 @@ class TestRead:
         (b'\xfa', '<i.', 10),
     ]
 
-    @pytest.mark.parametrize('byte, format, answer', halfsies)
-    def test_read_half_bit(self, byte, format, answer):
+    def test_read_half_bit(self):
         """ ensure reading half bytes (4 bit) works """
-        assert read(byte_io(byte), 0, 1, format) == answer
+        for byte, format, answer in self.halfsies:
+            self.assertEqual(read(byte_io(byte), 0, 1, format), answer)
 
     # --- test 24 bit (3 byte) reads
 
@@ -65,10 +61,10 @@ class TestRead:
         (b'\x00\x00\x01', '<i3', 65536),
     ]
 
-    @pytest.mark.parametrize('byte, format, answer', why_use_3_bytes)
-    def test_read_3_bytes(self, byte, format, answer):
+    def test_read_3_bytes(self):
         """ ensure 3 byte chunks are correctly read """
-        assert read(byte_io(byte), 0, 3, format) == answer
+        for byte, format, answer in self.why_use_3_bytes:
+            self.assertEqual(read(byte_io(byte), 0, 3, format), answer)
 
     # --- test backup
 
@@ -76,11 +72,10 @@ class TestRead:
         """ if lists are passed it the second values should be used as
         backup if the first read attempt raises """
         fi = byte_io(b'\xff\x98')
-        out = read(fi, [0, 1], [1, 1], ['bcd', 'bcd'])
-        assert out == 98
+        self.assertEqual(read(fi, [0, 1], [1, 1], ['bcd', 'bcd']), 98)
 
     def test_read_raises_when_all_fail(self):
         """ensure the backup function raises if it runs off the edge """
         fi = byte_io(b'\xff\xff')
-        with pytest.raises(ValueError):
+        with self.assertRaises(ValueError):
             read(fi, [0, 1], [1, 1], ['bcd', 'bcd'])
