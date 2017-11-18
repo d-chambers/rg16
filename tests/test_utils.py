@@ -12,10 +12,10 @@ def byte_io(byte_str):
     return BytesIO(byte_str)
 
 
-class TestRead(unittest.TestCase):
+class TestReadStream(unittest.TestCase):
     """
-    Tests for the read function, which should read all the weird binary
-    formats used in this file format.
+    Tests for the read stream function, which should read all the weird
+    binary formats used in this file format.
     """
 
     # --- tests bcd

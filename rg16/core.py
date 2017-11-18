@@ -16,7 +16,14 @@ from obspy.core import Stream, Trace, Stats, UTCDateTime
 
 from rg16.utils import read, open_file, read_block, quick_merge
 
-# ------------------- define specs of various blocks
+# try to import utm (this is ued to get lat/lon from traces, optional)
+from obspy.core.inventory import Inventory, Network, Station, Channel, Site
+try:
+    import utm
+except ImportError:
+    utm = None
+
+# -------------------- define specs of various blocks
 
 # blocks are specified as a list of tuples. Each tuple contains the following:
 # (name, startbyte, length, format), explanation as follows:
@@ -62,6 +69,9 @@ trace_header_block = [
     ('channel_code', 20 + 20, 1, '>i1'),  # https://imgur.com/a/4aneG
     ('trace_count', 20 + 21, 4, '>i4'),
     ('time', 20 + 2 * 32, 8, '>i8'),
+    ('x_coord', 20 + 4 * 32 + 17, 4, '>i4'),
+    ('y_coord', 20 + 4 * 32 + 21, 4, '>i4'),
+    ('depth', 20 + 4 * 32 + 25, 4, '>i4'),
 ]
 
 # since UTCDateTime cannot be compared to np.inf in py27 get a large timestamp
@@ -73,8 +83,24 @@ BIG_TS = UTCDateTime('3000-01-01').timestamp
 
 
 @open_file
-def read_rg16(fi, headonly=False, starttime=None, endtime=None, merge=False,
-              **kwargs):
+def is_rg16(fi, **kwargs):
+    """
+    Determine if a file or buffer contains an rg16 file.
+
+    :param fi: A path to the file to read or a buffer of an opened file.
+    :type fi: str, buffer
+    :return: bool
+    """
+    sample_format = read(fi, 2, 2, 'bcd')
+    manufacturer_code = read(fi, 16, 1, 'bcd')
+    version = read(fi, 42, 2, None)
+    con1 = version == b'\x01\x06' and sample_format == 8058
+    return con1 and manufacturer_code == 20
+
+
+@open_file
+def rg16_to_stream(fi, headonly=False, starttime=None, endtime=None,
+                   merge=False, **kwargs):
     """
     Read fairfield nodal's Receiver Gather File Format version 1.6-1.
 
@@ -91,6 +117,7 @@ def read_rg16(fi, headonly=False, starttime=None, endtime=None, merge=False,
         continuous data files having 100,000+ traces this will create
         more manageable streams.
     :type merge: bool
+
     :return: An ObsPy :class:`~obspy.core.stream.Stream` object.
     """
     if not is_rg16(fi):
@@ -117,20 +144,49 @@ def read_rg16(fi, headonly=False, starttime=None, endtime=None, merge=False,
     return Stream(traces=traces)
 
 
-@open_file
-def is_rg16(fi, **kwargs):
-    """
-    Determine if a file or buffer contains an rg16 file.
+def _make_channel(stats, utm_zone):
+    """ given a Stats object, make a Channel object (for inventory) """
+    assert hasattr(stats, 'rg16')
+    assert len(utm_zone) == 2
+    rg_header = stats.rg16
+    x = rg_header['x_coord'] / 10.
+    y = rg_header['y_coord'] / 10.
+    depth = rg_header['depth'] / 10.
+    latitude, longitude = utm.to_latlon(x, y, utm_zone[0], utm_zone[1])
+    chan = Channel(code=stats.channel, location_code=stats.location,
+                   latitude=latitude, longitude=longitude, depth=depth)
+    return chan
 
-    :param fi: A path to the file to read or a buffer of an opened file.
-    :type fi: str, buffer
-    :return: bool
+
+@open_file
+def rg16_to_inventory(fi, utm_zone):
     """
-    sample_format = read(fi, 2, 2, 'bcd')
-    manufacturer_code = read(fi, 16, 1, 'bcd')
-    version = read(fi, 42, 2, None)
-    con1 = version == b'\x01\x06' and sample_format == 8058
-    return con1 and manufacturer_code == 20
+    Create a basic inventory from the rg16 file.
+
+    Requires the
+
+    :param fi: buffer or path to file object .
+    :param utm_zone: A tuple of utm zone number (int) and zone letter (str).
+    :return: An ObsPy :class:`~obspy.core.inventory.Inventory` object.
+    """
+    assert utm is not None, 'This function requires the utm module'
+    st = rg16_to_stream(fi, headonly=True, merge=True)
+    # inv = Inventory(networks=[], source='rg16_file')
+    networks, stations, channels = {}, {}, {}
+    for tr in st:
+        stats = tr.stats
+        nslc = (stats.network, stats.station, stats.location, stats.channel)
+        chan = _make_channel(stats, utm_zone)
+
+        if not nslc[0] in networks:
+            nw = Network(code=nslc[0], )
+            networks[stats.network]
+        networks
+
+
+
+
+    return Inventory()
 
 
 # ------------ helper functions for formatting specific blocks
@@ -185,4 +241,7 @@ def _make_stats(theader, gheader):
         location=str(theader['index']),
         channel=str(theader['channel_code']),
     )
+
+    statsdict['rg16'] = theader  # dump the rest of the info in the rg16 block
+
     return Stats(statsdict)

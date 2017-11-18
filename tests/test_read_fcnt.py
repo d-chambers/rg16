@@ -5,15 +5,34 @@ import glob
 import io
 import os
 import unittest
-from os.path import join, abspath
+from os.path import join, abspath, dirname, basename
 
 import obspy
 
-from rg16.core import read_rg16
+from rg16.core import rg16_to_stream, rg16_to_inventory
 
-TEST_FCNT_DIRECTORY = join(abspath(os.getcwd()), 'test_data', 'fcnt')
+try:
+    import utc
+except ImportError:
+    utc = None
+
+TEST_FCNT_DIRECTORY = join(abspath(dirname(__file__)), 'test_data', 'fcnt')
 FCNT_FILES = glob.glob(join(TEST_FCNT_DIRECTORY, '*'))
-FCNT_STREAMS = [read_rg16(x) for x in FCNT_FILES]
+FCNT_STREAMS = [rg16_to_stream(x) for x in FCNT_FILES]
+
+# A dict of utm zones used in example files
+UTM_ZONES = {
+    'one_channel_many_traces.fcnt': (12, 'S'),
+    'three_chans_six_traces.fcnt': (11, 'T'),
+}
+
+FCNT_INVENTORIES = [rg16_to_inventory(x, UTM_ZONES[basename(x)])
+                    for x in FCNT_FILES if basename(x) in UTM_ZONES]
+
+assert len(FCNT_FILES), 'no test files found'
+
+
+# --------------------- tests for reading streams
 
 
 class TestStream(unittest.TestCase):
@@ -51,7 +70,7 @@ class TestStream(unittest.TestCase):
                 buff = io.BytesIO(fi.read())
             buff.seek(0)
             try:
-                read_rg16(buff, 'mseed')
+                rg16_to_stream(buff, 'mseed')
             except Exception:
                 self.fail('failed to read from bytesIO')
 
@@ -60,7 +79,7 @@ class TestReadNoData(unittest.TestCase):
     def test_no_data(self):
         """ ensure no data is returned when the option is used """
         for fcnt_file in FCNT_FILES:
-            st = read_rg16(fcnt_file, headonly=True)
+            st = rg16_to_stream(fcnt_file, headonly=True)
             for tr in st:
                 self.assertEqual(len(tr.data), 0)
                 self.assertNotEqual(tr.stats.npts, 0)
@@ -71,12 +90,12 @@ class TestStartTimeEndTime(unittest.TestCase):
         """ ensure starttimes and endtimes filter traces returned """
         for fcnt_file in FCNT_FILES:
             # get good times to filter on
-            st = read_rg16(fcnt_file, headonly=True)
+            st = rg16_to_stream(fcnt_file, headonly=True)
             stats = st[0].stats
             t1, t2 = stats.starttime.timestamp, stats.endtime.timestamp
             tpoint = obspy.UTCDateTime((t1 + t2) / 2.)
             # this should only return one trace for each channel
-            st = read_rg16(fcnt_file, starttime=tpoint, endtime=tpoint)
+            st = rg16_to_stream(fcnt_file, starttime=tpoint, endtime=tpoint)
             ids = {tr.id for tr in st}
             self.assertEqual(len(st), len(ids))
             # make sure tpoint is in the time range
@@ -91,10 +110,21 @@ class TestMerge(unittest.TestCase):
         """ ensure the merge option of read_rg16 merges all contiguous
         traces together """
         for fcnt_file in FCNT_FILES:
-            st_merged = read_rg16(fcnt_file, merge=True)
-            st = read_rg16(fcnt_file).merge()
+            st_merged = rg16_to_stream(fcnt_file, merge=True)
+            st = rg16_to_stream(fcnt_file).merge()
             self.assertEqual(len(st), len(st_merged))
             self.assertEqual(st, st_merged)
+
+
+# ---------------------- tests for reading inventories
+
+
+class TestReadInventory(unittest.TestCase):
+    def test_is_inventory(self):
+        if utc is None:
+            self.skipTest('cant import utc')
+        for inv in FCNT_INVENTORIES:
+            self.assertIsInstance(inv, obspy.Inventory)
 
 
 if __name__ == '__main__':

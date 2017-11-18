@@ -33,7 +33,7 @@ def open_file(func):
                 args = tuple([fi] + list(args[1:]))
                 return func(*args, **kwargs)
         except TypeError:  # assume we have been passed a buffer
-            if not hasattr(args[0], 'read'):
+            if not hasattr(args[0], 'read') or args[0].closed:
                 raise  # type error was in function call, not in opening file
             return func(*args, **kwargs)
 
@@ -156,10 +156,11 @@ def read_4_bit_right(fi, length):
 
 def quick_merge(traces, small_number=.000001):
     """
-    Specialized function for merging traces produced by read_rg16.
+    Specialized function for merging traces found in rg16 file.
 
     Requires that are of the same datatype, have the same sampling_rate,
-    and dont have data overlaps.
+    and dont have data overlaps. For streams with large numbers of traces
+    this can be many orders of magnitude faster than obspy.Stream.merge.
 
     :param traces: list of ObsPy :class:`~obspy.core.trace.Trace` objects.
     :param small_number:
