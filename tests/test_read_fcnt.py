@@ -3,17 +3,18 @@ tests for reading fcnt files
 """
 import glob
 import io
-import os
 import unittest
-from os.path import join, abspath
+from os.path import join, dirname
 
 import obspy
 
 from rg16.core import read_rg16
 
-TEST_FCNT_DIRECTORY = join(abspath(os.getcwd()), 'test_data', 'fcnt')
+TEST_FCNT_DIRECTORY = join(dirname(__file__), 'test_data', 'fcnt')
 FCNT_FILES = glob.glob(join(TEST_FCNT_DIRECTORY, '*'))
 FCNT_STREAMS = [read_rg16(x) for x in FCNT_FILES]
+
+assert len(FCNT_FILES), 'No test files found'
 
 
 class TestStream(unittest.TestCase):
