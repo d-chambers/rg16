@@ -126,9 +126,12 @@ def is_rg16(fi, **kwargs):
     :type fi: str, buffer
     :return: bool
     """
-    sample_format = read(fi, 2, 2, 'bcd')
-    manufacturer_code = read(fi, 16, 1, 'bcd')
-    version = read(fi, 42, 2, None)
+    try:
+        sample_format = read(fi, 2, 2, 'bcd')
+        manufacturer_code = read(fi, 16, 1, 'bcd')
+        version = read(fi, 42, 2, None)
+    except ValueError:  # if file too small
+        return False
     con1 = version == b'\x01\x06' and sample_format == 8058
     return con1 and manufacturer_code == 20
 

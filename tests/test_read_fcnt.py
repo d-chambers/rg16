@@ -8,13 +8,25 @@ from os.path import join, dirname
 
 import obspy
 
-from rg16.core import read_rg16
+from rg16.core import read_rg16, is_rg16
 
 TEST_FCNT_DIRECTORY = join(dirname(__file__), 'test_data', 'fcnt')
 FCNT_FILES = glob.glob(join(TEST_FCNT_DIRECTORY, '*'))
 FCNT_STREAMS = [read_rg16(x) for x in FCNT_FILES]
 
 assert len(FCNT_FILES), 'No test files found'
+
+
+class TestIsRG16(unittest.TestCase):
+    def test_rg16_files_identified(self):
+        """ ensure the rg16 files are correctly labeled as such """
+        for fcnt_file in FCNT_FILES:
+            self.assertTrue(is_rg16(fcnt_file))
+
+    def test_empty_buffer(self):
+        """ ensure an empty buffer returns false"""
+        buff = io.BytesIO()
+        self.assertFalse(is_rg16(buff))
 
 
 class TestStream(unittest.TestCase):
@@ -57,7 +69,7 @@ class TestStream(unittest.TestCase):
                 self.fail('failed to read from bytesIO')
 
 
-class TestReadNoData(unittest.TestCase):
+class TestReadHeadOnly(unittest.TestCase):
     def test_no_data(self):
         """ ensure no data is returned when the option is used """
         for fcnt_file in FCNT_FILES:
