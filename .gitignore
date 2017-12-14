@@ -72,7 +72,6 @@ target/
 *.swp
 .DS_store*
 
-# detex specific stuff
-tests/test_data/test_cases/*
-*kemmerer/*
-detex/datasets/**/*.mseed
+# larger file directory
+tests/test_data/large_fcnt
+

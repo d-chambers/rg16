@@ -7,7 +7,6 @@ import unittest
 from os.path import join, dirname
 
 import obspy
-
 from rg16.core import read_rg16, is_rg16
 
 TEST_FCNT_DIRECTORY = join(dirname(__file__), 'test_data', 'fcnt')

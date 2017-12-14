@@ -16,7 +16,9 @@ from obspy.core import Stream, Trace, Stats, UTCDateTime
 
 from rg16.utils import read, open_file, read_block, quick_merge
 
-# ------------------- define specs of various blocks
+
+# --------------------- define specs of needed blocks
+
 
 # blocks are specified as a list of tuples. Each tuple contains the following:
 # (name, startbyte, length, format), explanation as follows:
@@ -24,6 +26,7 @@ from rg16.utils import read, open_file, read_block, quick_merge
 # startbye - the byte position, relative to the block, to start reading
 # length - the number of bytes to read
 # format - format to interpret the data being read. see rg16.utils.read.
+
 
 # header block, combines header block one and two
 general_header_block = [
@@ -45,6 +48,7 @@ channel_header_block = [
 # combines extended header 1, 2, and 3
 extended_header_block = [
     ('num_records', 16 + 32, 4, '>i4'),
+    ('num_files', 20 + 32, 4, '>i4'),
     ('collection_method', 32 + 15, 1, '>i1'),
     ('line_number', 64, 4, '>i4'),
     ('receiver_point', 68, 4, '>i4'),
@@ -102,18 +106,15 @@ def read_rg16(fi, headonly=False, starttime=None, endtime=None, merge=False,
     gheader = read_block(fi, general_header_block)
     # byte number channel sets start at in file
     chan_set_start = (gheader['num_additional_headers'] + 1) * 32
-    # get the total number of traces from the channel sets
-    num_traces = _get_num_traces(fi, chan_set_start, gheader['channel_sets'])
     # get the byte number the extended headers start
     eheader_start = (gheader['channel_sets']) * 32 + chan_set_start
     # read trace headers
     ex_headers = gheader['extended_headers'] + gheader['external_headers']
     # get byte number trace headers start
     theader_start = eheader_start + (ex_headers * 32)
-    # get traces
-    traces = _make_traces(fi, theader_start, gheader, num_traces,
-                          head_only=headonly, starttime=time1, endtime=time2,
-                          merge=merge)
+    # get traces and return stream
+    traces = _make_traces(fi, theader_start, gheader, head_only=headonly,
+                          starttime=time1, endtime=time2, merge=merge)
     return Stream(traces=traces)
 
 
@@ -139,40 +140,31 @@ def is_rg16(fi, **kwargs):
 # ------------ helper functions for formatting specific blocks
 
 
-def _make_traces(fi, data_block_start, gheader, num_traces, head_only=False,
+def _make_traces(fi, data_block_start, gheader, head_only=False,
                  starttime=None, endtime=None, merge=False):
     """ make obspy traces from trace blocks and headers """
     traces = []  # list to store traces
     trace_position = data_block_start
-    for _ in range(num_traces):
-        theader = read_block(fi, trace_header_block, trace_position)
+    while True:  # read traces until parser falls of the end of file
+        try:
+            theader = read_block(fi, trace_header_block, trace_position)
+        except ValueError:  # this is the end, my only friend, the end
+            break
+        # get stats and update expected start position
         stats = _make_stats(theader, gheader)
+        trace_position += stats.npts * 4 + theader['num_ext_blocks'] * 32 + 20
+        # if wrong starttime / endtime just keep going
         if stats.endtime < starttime or stats.starttime > endtime:
             continue
-        if head_only:
+        if head_only:  # empty np array for head only
             data = np.array([])
-        else:
+        else:  # else read data
             data_start = trace_position + 20 + theader['num_ext_blocks'] * 32
             data = read(fi, data_start, theader['samples'] * 4, '>f4')
-        # update trace position
-        trace_position += stats.npts * 4 + theader['num_ext_blocks'] * 32 + 20
         traces.append(Trace(data=data, header=stats))
     if merge:
         traces = quick_merge(traces)
     return traces
-
-
-def _get_num_traces(fi, byte_start, number_channel_sets):
-    """
-    Get the number of traces contained in this file by reading trace sets.
-
-    Note: This function was created because multiplying channel_set in
-    the general header by num_records in the general header doesn't work for
-    larger files.
-    """
-    channel_sets = [read_block(fi, channel_header_block, byte_start + x * 32)
-                    for x in range(number_channel_sets)]
-    return np.sum([x['num_channels'] for x in channel_sets])
 
 
 def _make_stats(theader, gheader):
@@ -189,3 +181,29 @@ def _make_stats(theader, gheader):
         channel=str(theader['channel_code']),
     )
     return Stats(statsdict)
+
+# Note: I am leaving this function in the code but comment as it may be needed
+# again in the future and contains some non-obvious info about the format
+# def _get_num_traces(fi, byte_start, gheader, eheader):
+#     """
+#     Get the number of traces contained in this file by reading trace sets.
+#
+#     Note: This function was created because multiplying channel_sets in
+#     the general header by num_records in the extended header doesn't work for
+#     some larger files.
+#     """
+#     channel_sets = gheader['channel_sets']
+#     num_records = eheader['num_records']
+#
+#
+#     # try reading the channel_header blocks. This is seems to be correct
+#     # when there are millions of records in the file
+#     channel_dicts = [read_block(fi, channel_header_block, byte_start + x * 32)
+#                      for x in range(channel_sets)]
+#     num_traces1 = np.sum([x['num_channels'] for x in channel_dicts])
+#
+#     # try multiplying general_header and num_records. This seems to be correct
+#     # when there arent that many treaces in the file
+#     num_traces2 = channel_sets * num_records
+#
+#     return max(num_traces1, num_traces2)

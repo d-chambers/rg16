@@ -25,3 +25,9 @@ st = obspy.read(path_to_rg16)
 ```
 
 Write support is not planned.
+
+### Change Log:
+
+
+Version 0.0.3
+* Fixed bug where rg16 would only read first few traces of some larger files. 
