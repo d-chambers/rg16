@@ -67,6 +67,15 @@ class TestStream(unittest.TestCase):
             except Exception:
                 self.fail('failed to read from bytesIO')
 
+    def test_no_empty_streams(self):
+        """
+        There should be no empty streams. Related to issue #1
+        """
+        for st in FCNT_STREAMS:
+            for tr in st:
+                assert len(tr.data) > 0
+
+
 
 class TestReadHeadOnly(unittest.TestCase):
     def test_no_data(self):
