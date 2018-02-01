@@ -7,6 +7,7 @@ import unittest
 from os.path import join, dirname
 
 import obspy
+
 from rg16.core import read_rg16, is_rg16
 
 TEST_FCNT_DIRECTORY = join(dirname(__file__), 'test_data', 'fcnt')
@@ -73,8 +74,7 @@ class TestStream(unittest.TestCase):
         """
         for st in FCNT_STREAMS:
             for tr in st:
-                assert len(tr.data) > 0
-
+                self.assertGreater(len(tr.data), 0)
 
 
 class TestReadHeadOnly(unittest.TestCase):
