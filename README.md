@@ -30,4 +30,7 @@ Write support is not planned.
 
 
 Version 0.0.3
-* Fixed bug where rg16 would only read first few traces of some larger files. 
+* Fixed bug where rg16 would only read first few traces of some larger files.
+
+Vestion 0.0.4
+* Fixed bug that caused an offset of one trace see isue: #1

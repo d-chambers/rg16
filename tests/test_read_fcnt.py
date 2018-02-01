@@ -7,6 +7,7 @@ import unittest
 from os.path import join, dirname
 
 import obspy
+
 from rg16.core import read_rg16, is_rg16
 
 TEST_FCNT_DIRECTORY = join(dirname(__file__), 'test_data', 'fcnt')
@@ -66,6 +67,14 @@ class TestStream(unittest.TestCase):
                 read_rg16(buff, 'mseed')
             except Exception:
                 self.fail('failed to read from bytesIO')
+
+    def test_no_empty_streams(self):
+        """
+        There should be no empty streams. Related to issue #1
+        """
+        for st in FCNT_STREAMS:
+            for tr in st:
+                self.assertGreater(len(tr.data), 0)
 
 
 class TestReadHeadOnly(unittest.TestCase):

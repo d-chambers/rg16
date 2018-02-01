@@ -150,11 +150,13 @@ def _make_traces(fi, data_block_start, gheader, head_only=False,
             theader = read_block(fi, trace_header_block, trace_position)
         except ValueError:  # this is the end, my only friend, the end
             break
-        # get stats and update expected start position
+        # get stats
         stats = _make_stats(theader, gheader)
-        trace_position += stats.npts * 4 + theader['num_ext_blocks'] * 32 + 20
-        # if wrong starttime / endtime just keep going
+        # expected jump to next start position
+        jumps = stats.npts * 4 + theader['num_ext_blocks'] * 32 + 20
+        # if wrong starttime / endtime just keep going and update position
         if stats.endtime < starttime or stats.starttime > endtime:
+            trace_position += jumps
             continue
         if head_only:  # empty np array for head only
             data = np.array([])
@@ -162,6 +164,7 @@ def _make_traces(fi, data_block_start, gheader, head_only=False,
             data_start = trace_position + 20 + theader['num_ext_blocks'] * 32
             data = read(fi, data_start, theader['samples'] * 4, '>f4')
         traces.append(Trace(data=data, header=stats))
+        trace_position += jumps
     if merge:
         traces = quick_merge(traces)
     return traces
