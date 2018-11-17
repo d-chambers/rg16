@@ -24,6 +24,12 @@ path_to_rg16 = 'somefile.fcnt'
 st = obspy.read(path_to_rg16)
 ```
 
+Sometimes the obspy autodetect of file formats can fail. In this case, you can specify the format directly:
+
+```python
+st = obspy.read(path_to_rg16, format='rg16')
+```
+
 Write support is not planned.
 
 ### Change Log:
