@@ -1,5 +1,9 @@
 # rg16
 
+Note
+----
+Obspy now supports reading the rg16 format. Therefore, this package is no longer needed.
+If you have difficulties please open an issue with obspy.
 
 Obspy read support for Fairfield Nodal Receiver Gather format 1.6-1
 
